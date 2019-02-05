@@ -1,6 +1,6 @@
 # README
 
-## Automathttps://dcsc.lenovo.com/#/ed_install.sh
+## Automated_install.sh
 This script is intended to bootstrap the setup a simple Foreman/Katello server.
 
 ### Goal
