@@ -7,6 +7,9 @@
 #  * FQDN hostname
 #############################################################
 
+# Pull in variables specific to this installation
+source local.conf
+
 # Variables for tailoring this script to a specific network
 PRIMARY_INTERFACE=$(ip route list | grep default | awk '{print $5}')
 IP=$(ip addr show dev $PRIMARY_INTERFACE | grep 'inet ' | awk '{print $2}' | awk -F'/' '{print $1}')
@@ -16,8 +19,6 @@ DOMAIN=$(hostname --domain)
 DEFAULT_GW=$(ip route list | grep default | awk '{print $3}')
 REVERSE_ZONE=$(echo $IP | awk -F. '{print $3"." $2"." $1".in-addr.arpa"}')
 FORWARDERS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
-DEFAULT_ORG='FTL'
-DEFAULT_LOC='FTL_DC'
 ANSWER_FILE='/etc/foreman-installer/scenarios.d/katello-answers.yaml'
 
 # Install a few admin tools that I like to have around
