@@ -39,7 +39,9 @@ Build a simple lab network with Foreman/Katello providing DNS and DHCP.
   * Use the default partitioning scheme
   * Create a root password
 * Once the VM is created and rebooted
-  * copy the automated_install.sh and local.conf files to your home directory
+  * SSH into the new VM
+  * `git clone https://github.com/nosamttimhcs/crufty-bits.git`
+  * `cd crufty-bits/foreman-lab/`
   * edit the local.conf file as needed
   * `chmod 750 automated_install.sh`
   * `./automated_install.sh &`
