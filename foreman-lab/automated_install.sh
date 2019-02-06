@@ -16,7 +16,6 @@ if [ -z "$STAGE" ]; then
 fi
 
 # Variables for tailoring this script to a specific network
-source local.conf
 
 PRIMARY_INTERFACE=$(ip route list | grep default | awk '{print $5}')
 IP=$(ip addr show dev $PRIMARY_INTERFACE | grep 'inet ' | awk '{print $2}' | awk -F'/' '{print $1}')
@@ -27,6 +26,11 @@ DEFAULT_GW=$(ip route list | grep default | awk '{print $3}')
 REVERSE_ZONE=$(echo $IP | awk -F. '{print $3"." $2"." $1".in-addr.arpa"}')
 FORWARDERS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 ANSWER_FILE='/etc/foreman-installer/scenarios.d/katello-answers.yaml'
+TODAY=$(date +%Y-%m-%d)
+
+source local.conf
+
+PWD=$(pwd)
 
 function install_katello {
    # Install a few admin tools that I like to have around
@@ -170,6 +174,15 @@ EOF
 
    # First run of the foreman-installer using our answer file
    foreman-installer --scenario katello |& tee -a /root/foreman-installer-first_run.log
+
+### Rather than modify the answer file, I just discovered that individual plugins can be enabled
+### by passing options to the installer - https://theforeman.org/manuals/1.20/index.html#3.2.2InstallerOptions
+### For example, the following command would install Foreman, Katello and the discovery plugin
+###   foreman-installer --scenario katello \
+###   --enable-foreman-plugin-discovery \
+###   --enable-foreman-cli-discovery \
+###   --enable-foreman-proxy-plugin-discovery
+### I should incorporate this into a new version of this script
 }
 
 function foreman-install_second_run {
@@ -293,8 +306,10 @@ function create_products {
    --key "$LYNIS_GPG_KEY" \
    --name "$LYNIS_KEY_NAME"
 
+   hammer gpg list
+
    # Clean up the temp directory
-   cd -
+   cd $PWD
    rm -rf $GPG_IMPORT_DIR
 
    # Create products
@@ -309,6 +324,8 @@ function create_products {
    hammer product create --name "$PUPPET"
    hammer product create --name "$KATELLO"
    hammer product create --name "$LYNIS"
+
+   hammer product list
 
    # Create repos for each product. Only yum based repos for now, apt versions can be added later if/when needed.
    # As well, puppet module repos, such as Puppet Forge, will be added once the developers resolve the issue in Foreman 1.20.1.
@@ -383,22 +400,173 @@ function create_products {
    --mirror-on-sync "yes" \
    --verify-ssl-on-sync "yes"
 
+   hammer repository list
+
    # Syncronize the repos
    REPO_IDS=( $(hammer --output json repository list | jq -r '.[].Id') )
    for ID in ${REPO_IDS[@]}; do \
       hammer repository synchronize --id "$ID"
    done
+
+   # Create a daily sync-plan
+   SYNC_PLAN_NAME='Daily'
+   hammer sync-plan create \
+   --name "$SYNC_PLAN_NAME" \
+   --enabled=true \
+   --interval daily \
+   --organization-label $DEFAULT_ORG \
+   --sync-date "$TODAY $DAILY_SYNC_TIME"
+
+   # Associate the sync plan with all products
+    PRODUCT_IDS=$(hammer --output json product list | jq '.[].ID')
+    for ID in ${PRODUCT_IDS[@]}; do
+        hammer product set-sync-plan --sync-plan $SYNC_PLAN_NAME --id $ID
+    done
+
+    hammer product list --sync-plan $SYNC_PLAN_NAME
+}
+
+# VM snapshot taken here 2019-02-05_11:35am
+
+function create_content_structure {
+   ###################################################################################
+   ## Create Content View, Lifecycle Environments, Activation Keys and Subscriptions #
+   ###################################################################################
+
+   # Create a content view for our project
+   CONTENT_VIEW_NAME="FTL CentOS 7"
+   hammer content-view create \
+   --name "$CONTENT_VIEW_NAME" \
+   --description "Content view for FTL's CentOS 7"
+   hammer content-view list
+
+   # Add repositories to the content-view
+   CONTENT_VIEW_ID=$(hammer --output json content-view list | jq ".[] | select(.Name | contains(\"$CONTENT_VIEW_NAME\")) | .[\"Content View ID\"]")
+   UNIQUE_PRODUCTS_WITH_REPOS=$(hammer --output json repository list | jq -r '.[].Product' | sort | uniq | awk '{print $1}')
+   for PRODUCT in ${UNIQUE_PRODUCTS_WITH_REPOS[@]}; do
+      REPO_IDS=$(hammer --output json repository list | jq ".[] | select(.Product | contains(\"$PRODUCT\")) | .Id")
+      PRODUCT_ID=$(hammer --output json product list | jq ".[] | select(.Name | contains(\"$PRODUCT\")) | .ID")
+      for ID in ${REPO_IDS[@]}; do
+         hammer content-view add-repository \
+         --id "$CONTENT_VIEW_ID" \
+         --product-id "$PRODUCT_ID" \
+         --repository-id "$ID"; \
+      done
+   done
+
+   # Publish the content view
+   hammer content-view publish \
+   --name "$CONTENT_VIEW_NAME" \
+   --major 1 \
+   --minor 0 \
+   --description "Publishing repositories"
+
+   # Create lifecycle environments
+   hammer lifecycle-environment create \
+   --name "dev" \
+   --label "dev" \
+   --prior "Library"
+
+   hammer lifecycle-environment create \
+   --name "prod" \
+   --label "prod" \
+   --prior "dev"
+
+   hammer lifecycle-environment list
+
+   # Promote the intial version of our content view to the development environment
+   hammer content-view version promote \
+   --content-view "$CONTENT_VIEW_NAME" \
+   --version "1.0" \
+   --from-lifecycle-environment "Library" \
+   --to-lifecycle-environment "dev"
+
+   hammer content-view version list
+
+   # Create an activation key
+   ONTENT_VIEW_KEY="$CONTENT_VIEW_NAME - key"
+   hammer activation-key create \
+   --name "$CONTENT_VIEW_KEY" \
+   --description "Key to use with $CONTENT_VIEW_NAME" \
+   --lifecycle-environment "dev" \
+   --content-view "$CONTENT_VIEW_NAME" \
+   --unlimited-hosts
+
+   hammer activation-key list
+   hammer subscription list
+
+   SUBSCRIPTION_IDS=( $(hammer --output json subscription list | jq -r '.[].ID') )
+   for ID in ${SUBSCRIPTION_IDS[@]}; do \
+      hammer activation-key add-subscription \
+      --name "$CONTENT_VIEW_KEY" \
+      --quantity "1" \
+      --subscription-id "$ID"
+   done
+
+   hammer content-view info --id $CONTENT_VIEW_ID
+
 }
 
 function dev_stage {
-   ###################################################
-   ## Create Content View and Lifecycle Environments #
-   ###################################################
-   #
-   #hammer content-view create \
-   #--name "FTL CentOS 7" \
-   #--description "Content view for FTL's CentOS 7"
    echo "This is the dev stage"
+   ######################
+   # Setup Provisioning #
+   ######################
+
+   # I oculdn't figure out how to associate the foreman host with an org or location,
+   # using hammer, so unfortunately I had to make that association via the GUI
+   # This was necessary because otherwise I can't use its domain, its architecture, etc
+
+   # List the domains, the only one should be the one associated with the Foreman host
+   hammer domain list
+
+   # Create a subnet
+   FIRST_3_OCTETS=$(echo $IP | awk -F'.' '{print $1"."$2"."$3}')
+   NETWORK="$FIRST_3_OCTETS.0"
+   FROM="$FIRST_3_OCTETS.100"
+   TO="$FIRST_3_OCTETS.200"
+
+   hammer subnet create \
+   --name "DC" \
+   --network "$NETWORK" \
+   --mask "255.255.255.0" \
+   --gateway "$DEFAULT_GW" \
+   --from "$FROM" \
+   --to "$TO" \
+   --dns-primary "$IP" \
+   --boot-mode "DHCP" \
+   --ipam "DHCP"
+
+   hammer subnet list
+
+   # Associate the domain with our smart proxy
+   hammer domain update --id 1 --dns-id 1
+
+   # Associate the subnet with the domain
+   hammer subnet update --id 1 --domain-ids 1
+
+   # Associate the subnet with the smart proxy
+   hammer subnet update --id 1 --dhcp-id 1 --tftp-id 1 --dns-id 1
+
+   # Create a machine architecture
+   # hammer architecture list           # fails saying "Association not found for location" which I believe is a bug that is fixed in 1.21.x
+
+   # Create a partition table
+   #    We'll use a default one to start
+   #hammer partition_table create --name "CentOS 7 - Bare Metal - Default" --file "$PWD/centos7_bare-metal_default_part.txt"
+
+   # Create an OS
+   #    Already created from a puppet fact on the Foreman host
+   #hammer os create --name CentOS7 --major 7 --minor 6
+
+   # Create a new provisioning template
+   #    We'll use a default one to start
+   #hammer template create --name "kickstart CentOS7" --type provision --file "$PWD/ks-centos7-default.txt
+
+   # Associate OS with predefined template
+   PROVISION_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | startswith(\"provision\")) | .Id")
+   hammer template update --id "$PROVISION_TEMPLATE_ID" --operatingsystem-ids 1
+
 }
 
 #################################################
@@ -413,6 +581,7 @@ case $STAGE in
       foreman-install_second_run
       initial_full_backup
       create_products
+      create_content_structure
       dev_stage
       ;;
    foreman-install_first_run)
@@ -420,16 +589,23 @@ case $STAGE in
       foreman-install_second_run
       initial_full_backup
       create_products
+      create_content_structure
       dev_stage
       ;;
    foreman-install_second_run)
       foreman-install_second_run
       initial_full_backup
       create_products
+      create_content_structure
       dev_stage
       ;;
    create_products)
       create_products
+      create_content_structure
+      dev_stage
+      ;;
+   create_content_structure)
+      create_content_structure
       dev_stage
       ;;
    dev_stage)
