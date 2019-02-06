@@ -30,8 +30,6 @@ TODAY=$(date +%Y-%m-%d)
 
 source local.conf
 
-PWD=$(pwd)
-
 function install_katello {
    # Install a few admin tools that I like to have around
    yum install -y vim net-tools bind-utils mtr mlocate
@@ -309,7 +307,7 @@ function create_products {
    hammer gpg list
 
    # Clean up the temp directory
-   cd $PWD
+   cd -
    rm -rf $GPG_IMPORT_DIR
 
    # Create products
