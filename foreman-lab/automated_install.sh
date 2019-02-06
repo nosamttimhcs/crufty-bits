@@ -482,7 +482,7 @@ function create_content_structure {
    hammer content-view version list
 
    # Create an activation key
-   ONTENT_VIEW_KEY="$CONTENT_VIEW_NAME - key"
+   CONTENT_VIEW_KEY="$CONTENT_VIEW_NAME - key"
    hammer activation-key create \
    --name "$CONTENT_VIEW_KEY" \
    --description "Key to use with $CONTENT_VIEW_NAME" \
