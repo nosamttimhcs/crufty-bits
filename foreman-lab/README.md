@@ -44,7 +44,7 @@ Build a simple lab network with Foreman/Katello providing DNS and DHCP.
   * `cd crufty-bits/foreman-lab/`
   * edit the local.conf file as needed
   * `chmod 750 automated_install.sh`
-  * `./automated_install.sh &`
+  * `./automated_install.sh install_katello &`
 
 
 The build will take a very long time, but you will be able to watch the progress.
