@@ -40,11 +40,11 @@ Build a simple lab network with Foreman/Katello providing DNS and DHCP.
   * Create a root password
 * Once the VM is created and rebooted
   * SSH into the new VM
-  * Install git - `yum -y install git`
+  * `yum -y install git`
   * `git clone https://github.com/nosamttimhcs/crufty-bits.git`
   * `cd crufty-bits/foreman-lab/`
   * edit the local.conf file as needed
-  * `./automated_install.sh install_katello &`
+  * `./automated_install.sh full_install &`
 
 
 The build will take a very long time, but you will be able to watch the progress.
