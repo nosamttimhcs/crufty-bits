@@ -424,7 +424,6 @@ function create_products {
     hammer product list --sync-plan $SYNC_PLAN_NAME
 }
 
-# VM snapshot taken here 2019-02-05_11:35am
 
 function create_content_structure {
    ###################################################################################
@@ -545,25 +544,52 @@ function dev_stage {
    # Associate the subnet with the smart proxy
    hammer subnet update --id 1 --dhcp-id 1 --tftp-id 1 --dns-id 1
 
-   # Create a machine architecture
-   # hammer architecture list           # fails saying "Association not found for location" which I believe is a bug that is fixed in 1.21.x
+   hammer subnet info --id 1
 
-   # Create a partition table
+   # Create and list machine architectures
+   #    Both x86 and x86_64 seem to have been created
+   #hammer architecture create --name "CentOS 7"
+   hammer architecture list
+
+   # Create and list partition tables
    #    We'll use a default one to start
-   #hammer partition_table create --name "CentOS 7 - Bare Metal - Default" --file "$PWD/centos7_bare-metal_default_part.txt"
+   #hammer partition-table create --name "CentOS 7 - Bare Metal - Default" --file "$PWD/centos7_bare-metal_default_part.txt"
+   hammer partition-table list
 
-   # Create an OS
+   # Create and list OSes
    #    Already created from a puppet fact on the Foreman host
    #hammer os create --name CentOS7 --major 7 --minor 6
+   hammer os list
 
-   # Create a new provisioning template
+   # Create and list new provisioning templates
    #    We'll use a default one to start
    #hammer template create --name "kickstart CentOS7" --type provision --file "$PWD/ks-centos7-default.txt
+   hammer template list
 
    # Associate OS with predefined template
    PROVISION_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | startswith(\"provision\")) | .Id")
    hammer template update --id "$PROVISION_TEMPLATE_ID" --operatingsystem-ids 1
 
+   # Associate OS with architecture
+   ARCHITECTURE_ID=$(hammer --output json architecture list | jq ".[] | select(.Name | contains(\"$ARCH\")) | .Id")
+   hammer os update --id 1 --architecture-ids $ARCHITECTURE_ID
+
+   # Associate OS with partition table
+   PARTITION_TABLE_ID=$(hammer --output json partition-table list | jq ".[] | select(.Name | contains(\"Kickstart default thin\")) | .Id")
+   hammer os update --id 1 --ptable-ids $PARTITION_TABLE_ID
+
+   # Associate OS with install media
+   INSTALL_MEDIA_ID=$(hammer --output json medium list | jq ".[] | select(.Name | contains(\"CentOS\")) | .Id")
+   hammer os update --id 1 --medium-ids $INSTALL_MEDIA_ID
+
+   # Associate OS with provisioning templates
+   PROVISIONING_TEMPLATE_IDS=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | .Id")
+   CSV_PROVISIONING_TEMPLATE_IDS=$(echo $PROVISIONING_TEMPLATE_IDS | sed s/\ /,/g)
+   #PXE_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"PXELinux\")) | .Id")
+   #PROVISION_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"provision\")) | .Id")
+   #FINISH_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"finish\")) | .Id")
+   #USER_DATA_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"user_data\")) | .Id")
+   hammer os update --provisioning-template-ids $CSV_PROVISIONING_TEMPLATE_IDS
 }
 
 #################################################
