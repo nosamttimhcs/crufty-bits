@@ -245,9 +245,9 @@ function create_products {
    # Set some defaults for Foreman and Katello #
    #############################################
 
-   # Set default Organizatino and Location
+   # Set default Organization and Location
    hammer defaults add --param-name organization --param-value "$DEFAULT_ORG"
-   hammer defaults add --param-name location --param-value "$DEFAULT_LOC"
+   #hammer defaults add --param-name location --param-value "$DEFAULT_LOC"
 
 
    ##############################
@@ -511,9 +511,8 @@ function dev_stage {
    # Setup Provisioning #
    ######################
 
-   # I oculdn't figure out how to associate the foreman host with an org or location,
-   # using hammer, so unfortunately I had to make that association via the GUI
-   # This was necessary because otherwise I can't use its domain, its architecture, etc
+   # First we need to remove the defaults, so that hammer can see the foreman host, domain, etc
+   hammer defaults delete --param-name organization
 
    # List the domains, the only one should be the one associated with the Foreman host
    hammer domain list
@@ -573,6 +572,20 @@ function dev_stage {
 
 # Check to see which stage of the installer we should start from
 case $STAGE in
+   stage1)
+      install_katello
+      foreman-install_first_run
+      foreman-install_second_run
+      initial_full_backup
+      ;;
+   stage2)
+      create_products
+      ;;
+   stage3)
+      create_content_structure
+      archival_backup
+      # dev_stage not run, so that I can snapshot here before continuing
+      ;;
    install_katello)
       install_katello
       foreman-install_first_run
