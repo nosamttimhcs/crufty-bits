@@ -613,7 +613,10 @@ case $STAGE in
    stage3)
       create_content_structure
       archival_backup
-      # dev_stage not run, so that I can snapshot here before continuing
+      ;;
+   stage3)
+      setup_provisioning
+      dev_stage
       ;;
    full_install)
       install_katello
@@ -622,6 +625,7 @@ case $STAGE in
       initial_full_backup
       create_products
       create_content_structure
+      setup_provisioning
       dev_stage
       ;;
    foreman-install_first_run)
@@ -630,6 +634,7 @@ case $STAGE in
       initial_full_backup
       create_products
       create_content_structure
+      setup_provisioning
       dev_stage
       ;;
    foreman-install_second_run)
@@ -637,15 +642,18 @@ case $STAGE in
       initial_full_backup
       create_products
       create_content_structure
+      setup_provisioning
       dev_stage
       ;;
    create_products)
       create_products
       create_content_structure
+      setup_provisioning
       dev_stage
       ;;
    create_content_structure)
       create_content_structure
+      setup_provisioning
       dev_stage
       ;;
    setup_provisioning)
