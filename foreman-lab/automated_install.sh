@@ -576,7 +576,7 @@ function dev_stage {
 
    # Associate OS with partition table
    PARTITION_TABLE_ID=$(hammer --output json partition-table list | jq ".[] | select(.Name | contains(\"Kickstart default thin\")) | .Id")
-   hammer os update --id 1 --ptable-ids $PARTITION_TABLE_ID
+   hammer os update --id 1 --partition-table-ids $PARTITION_TABLE_ID
 
    # Associate OS with install media
    INSTALL_MEDIA_ID=$(hammer --output json medium list | jq ".[] | select(.Name | contains(\"CentOS\")) | .Id")
@@ -589,7 +589,7 @@ function dev_stage {
    #PROVISION_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"provision\")) | .Id")
    #FINISH_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"finish\")) | .Id")
    #USER_DATA_TEMPLATE_ID=$(hammer --output json template list | jq ".[] | select(.Name | startswith(\"Kickstart default\")) | select(.Type | contains(\"user_data\")) | .Id")
-   hammer os update --provisioning-template-ids $CSV_PROVISIONING_TEMPLATE_IDS
+   hammer os update --id 1 --provisioning-template-ids $CSV_PROVISIONING_TEMPLATE_IDS
 }
 
 #################################################
