@@ -523,6 +523,8 @@ function setup_provisioning {
 
    hammer subnet create \
    --name "DC" \
+   --organization "$DEFAULT_ORG" \
+   --location "$DEFAULT_LOC" \
    --network "$NETWORK" \
    --mask "255.255.255.0" \
    --gateway "$DEFAULT_GW" \
@@ -531,6 +533,10 @@ function setup_provisioning {
    --dns-primary "$IP" \
    --boot-mode "DHCP" \
    --ipam "DHCP"
+# Need to add the following to the subnet declaration
+# Remote execution proxy
+# Template proxy
+# Discovery proxy
 
    hammer subnet list
 
@@ -593,6 +599,8 @@ function setup_provisioning {
 
 function dev_stage {
 echo "This is the dev stage"
+   # Deploy the pxe templates to the smart proxies
+   hammer template build-pxe-default
 }
 
 #################################################
