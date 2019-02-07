@@ -622,7 +622,7 @@ case $STAGE in
       create_content_structure
       archival_backup
       ;;
-   stage3)
+   stage4)
       setup_provisioning
       dev_stage
       ;;
