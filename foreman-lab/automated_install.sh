@@ -504,8 +504,7 @@ function create_content_structure {
 
 }
 
-function dev_stage {
-   echo "This is the dev stage"
+function setup_provisioning {
    ######################
    # Setup Provisioning #
    ######################
@@ -592,6 +591,10 @@ function dev_stage {
    hammer os update --id 1 --provisioning-template-ids $CSV_PROVISIONING_TEMPLATE_IDS
 }
 
+function dev_stage {
+echo "This is the dev stage"
+}
+
 #################################################
 #                   Main                        #
 #################################################
@@ -612,7 +615,7 @@ case $STAGE in
       archival_backup
       # dev_stage not run, so that I can snapshot here before continuing
       ;;
-   install_katello)
+   full_install)
       install_katello
       foreman-install_first_run
       foreman-install_second_run
@@ -643,6 +646,10 @@ case $STAGE in
       ;;
    create_content_structure)
       create_content_structure
+      dev_stage
+      ;;
+   setup_provisioning)
+      setup_provisioning
       dev_stage
       ;;
    dev_stage)
