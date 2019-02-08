@@ -61,30 +61,122 @@ function install_katello {
 }
 
 function foreman-install_first_run {
-   # First run of the foreman-installer with the following plugins enabled
-   foreman-installer \
-   --scenario katello \
-   --enable-foreman-plugin-dhcp_browser \
-   --enable-foreman-plugin-discovery \ 
-   --foreman-plugin-discovery-install-images=true \
-   --enable-foreman-plugin-docker \ 
-   --enable-foreman-plugin-hooks \ 
-   --enable-foreman-plugin-openscap \ 
-   --enable-foreman-plugin-remote_execution \ 
-   --enable-foreman-plugin-tasks \ 
-   --enable-foreman-proxy-plugin-dynflow \ 
-   --enable-foreman-proxy-plugin-openscap \ 
-   --enable-foreman-proxy-plugin-remote_execution-ssh \ 
-   --enable-foreman-proxy-plugin-discovery \ 
-   --foreman-proxy-plugin-discovery-install-images=true \
-   --enable-foreman-compute-libvirt \
-   --enable-foreman-compute-docker \
-   --enable-foreman-cli \
-   --enable-foreman-cli-openscap \
-   --enable-foreman-cli-discovery \
-   --enable-foreman-cli-tasks \
-   --enable-foreman-cli-remote_execution \
-   |& tee -a /root/foreman-installer-first_run.log
+   # Replace default answer file with mine
+   mv /etc/foreman-installer/scenarios.d/katello-answers.yaml /etc/foreman-installer/scenarios.d/katello-answers.yaml.orig
+   cat << EOF > $ANSWER_FILE
+# Format:
+# <classname>: false - don't include this class
+# <classname>: true - include and use the defaults
+# <classname>:
+#   <param>: <value> - include and override the default(s)
+#
+# See params.pp in each class for what options are available
+
+---
+certs:
+  generate: true
+  deploy: true
+  group: foreman
+katello:
+  package_names:
+  - katello
+  - tfm-rubygem-katello
+foreman:
+  organizations_enabled: true
+  locations_enabled: true
+  initial_organization: Default Organization
+  initial_location: Default Location
+  custom_repo: true
+  configure_epel_repo: false
+  configure_scl_repo: false
+  max_keepalive_requests: 10000
+  ssl: true
+  server_ssl_cert: /etc/pki/katello/certs/katello-apache.crt
+  server_ssl_key: /etc/pki/katello/private/katello-apache.key
+  server_ssl_ca: /etc/pki/katello/certs/katello-default-ca.crt
+  server_ssl_chain: /etc/pki/katello/certs/katello-server-ca.crt
+  server_ssl_crl: ''
+  client_ssl_cert: /etc/foreman/client_cert.pem
+  client_ssl_key: /etc/foreman/client_key.pem
+  client_ssl_ca: /etc/foreman/proxy_ca.pem
+  websockets_encrypt: true
+  websockets_ssl_key: /etc/pki/katello/private/katello-apache.key
+  websockets_ssl_cert: /etc/pki/katello/certs/katello-apache.crt
+  passenger_ruby: /usr/bin/tfm-ruby
+  passenger_ruby_package: tfm-rubygem-passenger-native
+  keepalive: true
+foreman_proxy_content:
+  pulp_master: true
+  qpid_router_broker_addr: localhost
+puppet:
+  server: true
+  server_environments_owner: apache
+  server_foreman_ssl_ca: /etc/pki/katello/puppet/puppet_client_ca.crt
+  server_foreman_ssl_cert: /etc/pki/katello/puppet/puppet_client.crt
+  server_foreman_ssl_key: /etc/pki/katello/puppet/puppet_client.key
+foreman_proxy:
+  custom_repo: true
+  http: true
+  ssl_port: '9090'
+  templates: true
+  ssl_ca: /etc/foreman-proxy/ssl_ca.pem
+  ssl_cert: /etc/foreman-proxy/ssl_cert.pem
+  ssl_key: /etc/foreman-proxy/ssl_key.pem
+  foreman_ssl_ca: /etc/foreman-proxy/foreman_ssl_ca.pem
+  foreman_ssl_cert: /etc/foreman-proxy/foreman_ssl_cert.pem
+  foreman_ssl_key: /etc/foreman-proxy/foreman_ssl_key.pem
+  use_autosignfile: true
+  manage_puppet_group: false
+foreman_proxy::plugin::pulp:
+  enabled: true
+  pulpnode_enabled: false
+foreman::plugin::ansible: false
+foreman::plugin::bootdisk: false
+foreman::plugin::chef: false
+foreman::plugin::default_hostgroup: false
+foreman::plugin::dhcp_browser: true
+foreman::plugin::discovery: true
+foreman::plugin::docker: true
+foreman::plugin::hooks: true
+foreman::plugin::openscap: true
+foreman::plugin::puppetdb: false
+foreman::plugin::remote_execution: true
+foreman::plugin::setup: false
+foreman::plugin::tasks: true
+foreman::plugin::templates: false
+foreman_proxy::plugin::ansible: false
+foreman_proxy::plugin::chef: false
+foreman_proxy::plugin::dhcp::infoblox: false
+foreman_proxy::plugin::dns::infoblox: false
+foreman_proxy::plugin::dynflow: true
+foreman_proxy::plugin::openscap: true
+foreman_proxy::plugin::remote_execution::ssh: true
+foreman_proxy::plugin::discovery: true
+foreman::compute::ec2: false
+foreman::compute::gce: false
+foreman::compute::libvirt: true
+foreman::compute::openstack: false
+foreman::compute::ovirt: false
+foreman::compute::rackspace: false
+foreman::compute::vmware: false
+foreman::cli: true
+foreman::cli::openscap: true
+foreman::cli::discovery: true
+foreman::cli::tasks: true
+foreman::cli::templates: false
+foreman::cli::remote_execution: true
+EOF
+
+   # Update the default Org and Location
+   sed -i -e "s/Default Organization/$DEFAULT_ORG/" -e "s/Default Location/$DEFAULT_LOC/" $ANSWER_FILE
+
+   # First run of the foreman-installer using our answer file
+   foreman-installer --scenario katello |& tee -a /root/foreman-installer-first_run.log
+
+### Rather than modify the answer file, I just discovered that individual plugins can be enabled
+### by passing options to the installer - https://theforeman.org/manuals/1.20/index.html#3.2.2InstallerOptions
+### Unfortunately, not all options can be set, so it looks like using a modified answer file is the only option
+
 }
 
 function foreman-install_second_run {
